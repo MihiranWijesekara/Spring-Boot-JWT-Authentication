@@ -1,58 +1,38 @@
 package com.example.JWT_Authentication.model;
 
 import jakarta.persistence.*;
+import lombok.*;
+
 import java.time.Instant;
 
-@Entity
-@Table(name = "refresh_tokens")
+@Getter @Setter
+@NoArgsConstructor @AllArgsConstructor
+@Entity @Table(name = "refresh_token",
+        indexes = {@Index(name = "idx_ref_token_token_id", columnList = "tokenId", unique = true)})
 public class RefreshToken {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Who owns this token */
     @OneToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
 
-    @Column(nullable = false, unique = true)
-    private String token;
+    /** Public identifier we can look up quickly (kept in cookie). */
+    @Column(nullable = false, unique = true, length = 36)
+    private String tokenId; // UUID string
+
+    /** Hash (SHA-256 Base64) of the raw secret part. Never store the raw token. */
+    @Column(nullable = false, length = 64) // 44 for Base64, 64 leaves headroom
+    private String tokenHash;
 
     @Column(nullable = false)
     private Instant expiryDate;
 
-    public RefreshToken() {
-    }
+    @Column(nullable = false)
+    private boolean revoked = false;
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-    }
-
-    public String getToken() {
-        return token;
-    }
-
-    public void setToken(String token) {
-        this.token = token;
-    }
-
-    public Instant getExpiryDate() {
-        return expiryDate;
-    }
-
-    public void setExpiryDate(Instant expiryDate) {
-        this.expiryDate = expiryDate;
-    }
+    /** If rotated, track the replacement's tokenId (optional). */
+    private String replacedByTokenId;
 }

@@ -22,7 +22,6 @@ public class JwtUtils {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
-    // Human-readable durations from properties, e.g. 15m, 24h
     @Value("${jwt.expiration}")
     private Duration jwtExpiration;
 
@@ -33,13 +32,11 @@ public class JwtUtils {
 
     @PostConstruct
     void init() {
-        // Build the HMAC key once
         this.signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Create a short-lived access token for the given username. */
     public String generateTokenFromUsername(String username) {
-        final long now = System.currentTimeMillis();
+        long now = System.currentTimeMillis();
         return Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date(now))
@@ -48,23 +45,14 @@ public class JwtUtils {
                 .compact();
     }
 
-    /** Extract username (subject) from JWT. */
     public String getUserNameFromJwtToken(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(signingKey)
-                .build()
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+        return Jwts.parserBuilder().setSigningKey(signingKey).build()
+                .parseClaimsJws(token).getBody().getSubject();
     }
 
-    /** Validate signature/expiry of the JWT. */
     public boolean validateJwtToken(String token) {
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(signingKey)
-                    .build()
-                    .parseClaimsJws(token);
+            Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             log.error("JWT validation error: {}", e.getMessage());
@@ -72,36 +60,21 @@ public class JwtUtils {
         }
     }
 
-    // ---------- Cookie helpers ----------
-
-    /** Access-token cookie (JWT) scoped to site root. */
+    // ----- Access-token cookie -----
     public ResponseCookie generateJwtCookie(String token) {
         return ResponseCookie.from("jwt", token)
-                .httpOnly(true)
-                .secure(true)
-                .path("/")              // send to all endpoints
+                .httpOnly(true).secure(true).path("/")
                 .sameSite("Strict")
                 .maxAge((int) jwtExpiration.toSeconds())
                 .build();
     }
-
     public ResponseCookie getCleanJwtCookie() {
         return ResponseCookie.from("jwt", "")
-                .httpOnly(true)
-                .secure(true)
-                .path("/")
-                .sameSite("Strict")
-                .maxAge(0)
-                .build();
+                .httpOnly(true).secure(true).path("/")
+                .sameSite("Strict").maxAge(0).build();
     }
 
-    /** For other beans that need the refresh TTL (seconds). */
-    public long getRefreshTtlSeconds() {
-        return refreshExpiration.toSeconds();
-    }
-
-    /** For other beans that need the refresh TTL (millis). */
-    public long getRefreshTtlMillis() {
-        return refreshExpiration.toMillis();
-    }
+    // Helpers for refresh TTL
+    public long getRefreshTtlMillis() { return refreshExpiration.toMillis(); }
+    public long getRefreshTtlSeconds() { return refreshExpiration.toSeconds(); }
 }
