@@ -99,7 +99,13 @@ public class AuthController {
     public ResponseEntity<String> signout() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof UserDetailsImpl udi) {
-            refreshTokenService.deleteByUserId(udi.getId());
+            try {
+                int deletedCount = refreshTokenService.deleteByUserId(udi.getId());
+                System.out.println("Deleted " + deletedCount + " refresh tokens for user: " + udi.getId());
+            } catch (Exception e) {
+                System.err.println("Error deleting refresh tokens: " + e.getMessage());
+                e.printStackTrace(); // Add this for detailed error
+            }
         }
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, jwtUtils.getCleanJwtCookie().toString())

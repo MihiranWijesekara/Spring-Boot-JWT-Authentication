@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -101,7 +102,15 @@ public class RefreshTokenService {
 
     @Transactional
     public int deleteByUserId(Long userId) {
-        return refreshTokenRepository.deleteByUser(userRepository.findById(userId).orElseThrow());
+        // Method 1: Using the custom query (more efficient)
+        int deletedCount = refreshTokenRepository.deleteByUserId(userId);
+
+        // For debugging, you can also use this approach:
+        // List<RefreshToken> tokens = refreshTokenRepository.findByUser_Id(userId);
+        // refreshTokenRepository.deleteAll(tokens);
+        // int deletedCount = tokens.size();
+
+        return deletedCount;
     }
 
     public ResponseCookie getCleanRefreshTokenCookie() {

@@ -59,7 +59,8 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**", "/h2-console/**").permitAll()
-                        .requestMatchers("/api/test/**").permitAll()
+                        .requestMatchers("/api/test/public").permitAll()   // ✅ allow only public
+                        .requestMatchers("/api/test/private").authenticated()
                         .anyRequest().authenticated()
                 );
 

@@ -1,5 +1,6 @@
 package com.example.JWT_Authentication.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -12,8 +13,10 @@ public class TestController {
     }
 
     @GetMapping("/private")
+    @PreAuthorize("hasRole('USER')")
     public String privateEndpoint() {
         return "hello private";
     }
+
 }
 
