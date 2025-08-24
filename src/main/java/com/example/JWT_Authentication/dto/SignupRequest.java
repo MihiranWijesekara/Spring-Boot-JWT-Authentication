@@ -1,20 +1,27 @@
-// src/main/java/com/example/JWT_Authentication/dto/SignupRequest.java
 package com.example.JWT_Authentication.dto;
 
+import com.example.JWT_Authentication.model.User;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
 
-@Getter @Setter @NoArgsConstructor
+import java.util.Set;
+
+@Data
 public class SignupRequest {
     @NotBlank
+    @Size(min = 3, max = 20)
     private String username;
 
-    @NotBlank @Email
+    @NotBlank
+    @Size(max = 50)
+    @Email
     private String email;
 
     @NotBlank
+    @Size(min = 6, max = 40)
     private String password;
+
+    private Set<User.Role> roles;
 }
