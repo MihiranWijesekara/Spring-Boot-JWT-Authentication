@@ -1,10 +1,7 @@
 package com.example.JWT_Authentication.controller;
 
-import com.example.JWT_Authentication.dto.JwtResponse;
 import com.example.JWT_Authentication.dto.LoginRequest;
-import com.example.JWT_Authentication.dto.RefreshTokenRequest;
 import com.example.JWT_Authentication.dto.SignupRequest;
-import com.example.JWT_Authentication.exception.TokenRefreshException;
 import com.example.JWT_Authentication.model.User;
 import com.example.JWT_Authentication.security.RefreshTokenService;
 import com.example.JWT_Authentication.security.UserDetailsImpl;
@@ -13,12 +10,16 @@ import com.example.JWT_Authentication.util.JwtUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
-import org.springframework.security.authentication.*;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins="*", maxAge=3600)
 @RestController
@@ -43,7 +44,13 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Error: Password is required!");
         }
 
-        User saved = userService.save(new User(null, req.getUsername(), req.getEmail(), req.getPassword()));
+        User user = new User();
+        user.setUsername(req.getUsername());
+        user.setEmail(req.getEmail());
+        user.setPassword(req.getPassword());
+        user.setRoles(req.getRoles());
+
+        User saved = userService.save(user);
         return ResponseEntity.ok("User registered with id: " + saved.getId());
     }
 
@@ -60,11 +67,16 @@ public class AuthController {
         ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(jwt);
         ResponseCookie refreshCookie = refreshPair.cookie();
 
-        // Best-practice: don't send tokens in body; send only profile
+        // Include roles in response
+        Set<String> roles = principal.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
+
         Map<String, Object> body = Map.of(
                 "id", principal.getId(),
                 "username", principal.getUsername(),
-                "email", principal.getEmail()
+                "email", principal.getEmail(),
+                "roles", roles
         );
 
         return ResponseEntity.ok()
@@ -83,10 +95,15 @@ public class AuthController {
 
         ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(newJwt);
 
+        Set<String> roles = oldToken.getUser().getRoles().stream()
+                .map(Enum::name)
+                .collect(Collectors.toSet());
+
         Map<String, Object> body = Map.of(
                 "id", oldToken.getUser().getId(),
                 "username", oldToken.getUser().getUsername(),
-                "email", oldToken.getUser().getEmail()
+                "email", oldToken.getUser().getEmail(),
+                "roles", roles
         );
 
         return ResponseEntity.ok()
@@ -104,7 +121,7 @@ public class AuthController {
                 System.out.println("Deleted " + deletedCount + " refresh tokens for user: " + udi.getId());
             } catch (Exception e) {
                 System.err.println("Error deleting refresh tokens: " + e.getMessage());
-                e.printStackTrace(); // Add this for detailed error
+                e.printStackTrace();
             }
         }
         return ResponseEntity.ok()
@@ -112,5 +129,4 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, refreshTokenService.getCleanRefreshTokenCookie().toString())
                 .body("Signed out");
     }
-
 }

@@ -1,80 +1,112 @@
 package com.example.JWT_Authentication.util;
 
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import com.example.JWT_Authentication.security.UserDetailsImpl;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import jakarta.annotation.PostConstruct;
-import lombok.extern.slf4j.Slf4j;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.WebUtils;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
+import java.security.Key;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
-@Slf4j
 @Component
 public class JwtUtils {
 
-    @Value("${jwt.secret}")
+    @Value("${app.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${jwt.expiration}")
-    private Duration jwtExpiration;
+    @Value("${app.jwt.expirationMs}")
+    private int jwtExpirationMs;
 
-    @Value("${jwt.refreshExpiration}")
-    private Duration refreshExpiration;
+    @Value("${app.jwt.refreshExpirationMs}")
+    private int refreshExpirationMs;
 
-    private SecretKey signingKey;
+    @Value("${app.jwt.cookieName}")
+    private String jwtCookie;
 
-    @PostConstruct
-    void init() {
-        this.signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    private Key key() {
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
     public String generateTokenFromUsername(String username) {
-        long now = System.currentTimeMillis();
         return Jwts.builder()
                 .setSubject(username)
-                .setIssuedAt(new Date(now))
-                .setExpiration(new Date(now + jwtExpiration.toMillis()))
-                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .signWith(key(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
+    public String generateToken(Authentication authentication) {
+        UserDetailsImpl userPrincipal = (UserDetailsImpl) authentication.getPrincipal();
+
+        List<String> roles = userPrincipal.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        return Jwts.builder()
+                .setSubject(userPrincipal.getUsername())
+                .claim("roles", roles)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .signWith(key(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String getUsernameFromJwtToken(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key())
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+    }
+
+    // Add this method to fix the error in AuthTokenFilter
     public String getUserNameFromJwtToken(String token) {
-        return Jwts.parserBuilder().setSigningKey(signingKey).build()
-                .parseClaimsJws(token).getBody().getSubject();
+        return getUsernameFromJwtToken(token);
     }
 
-    public boolean validateJwtToken(String token) {
+    public boolean validateJwtToken(String authToken) {
         try {
-            Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(token);
+            Jwts.parserBuilder().setSigningKey(key()).build().parseClaimsJws(authToken);
             return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            log.error("JWT validation error: {}", e.getMessage());
-            return false;
+        } catch (Exception e) {
+            // Handle exception
         }
+        return false;
     }
 
-    // ----- Access-token cookie -----
-    public ResponseCookie generateJwtCookie(String token) {
-        return ResponseCookie.from("jwt", token)
-                .httpOnly(true).secure(true).path("/")
-                .sameSite("Strict")
-                .maxAge((int) jwtExpiration.toSeconds())
+    public ResponseCookie generateJwtCookie(String jwt) {
+        return ResponseCookie.from(jwtCookie, jwt)
+                .path("/api")
+                .maxAge(24 * 60 * 60)
+                .httpOnly(true)
                 .build();
     }
+
     public ResponseCookie getCleanJwtCookie() {
-        return ResponseCookie.from("jwt", "")
-                .httpOnly(true).secure(true).path("/")
-                .sameSite("Strict").maxAge(0).build();
+        return ResponseCookie.from(jwtCookie, "").path("/api").build();
     }
 
-    // Helpers for refresh TTL
-    public long getRefreshTtlMillis() { return refreshExpiration.toMillis(); }
-    public long getRefreshTtlSeconds() { return refreshExpiration.toSeconds(); }
+    // Add these methods for refresh token functionality
+    public long getRefreshTtlMillis() {
+        return refreshExpirationMs;
+    }
+
+    public long getRefreshTtlSeconds() {
+        return refreshExpirationMs / 1000;
+    }
+    // Add this method to JwtUtils class
+    public String getCookieName() {
+        return jwtCookie;
+    }
 }
