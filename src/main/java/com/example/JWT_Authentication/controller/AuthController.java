@@ -88,11 +88,8 @@ public class AuthController {
     @PostMapping("/refreshtoken")
     public ResponseEntity<?> refresh(@CookieValue(name="refreshToken", required=false) String refreshCookieVal) {
         var oldToken = refreshTokenService.verifyCookieAndLoad(refreshCookieVal);
-
-        // rotate refresh + issue new access
         var rotated = refreshTokenService.rotate(oldToken);
         String newJwt = jwtUtils.generateTokenFromUsername(oldToken.getUser().getUsername());
-
         ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(newJwt);
 
         Set<String> roles = oldToken.getUser().getRoles().stream()
@@ -112,21 +109,21 @@ public class AuthController {
                 .body(body);
     }
 
-    @PostMapping("/signout")
-    public ResponseEntity<String> signout() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof UserDetailsImpl udi) {
-            try {
-                int deletedCount = refreshTokenService.deleteByUserId(udi.getId());
-                System.out.println("Deleted " + deletedCount + " refresh tokens for user: " + udi.getId());
-            } catch (Exception e) {
-                System.err.println("Error deleting refresh tokens: " + e.getMessage());
-                e.printStackTrace();
-            }
-        }
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, jwtUtils.getCleanJwtCookie().toString())
-                .header(HttpHeaders.SET_COOKIE, refreshTokenService.getCleanRefreshTokenCookie().toString())
-                .body("Signed out");
-    }
+//    @PostMapping("/signout")
+//    public ResponseEntity<String> signout() {
+//        var auth = SecurityContextHolder.getContext().getAuthentication();
+//        if (auth != null && auth.getPrincipal() instanceof UserDetailsImpl udi) {
+//            try {
+//                int deletedCount = refreshTokenService.deleteByUserId(udi.getId());
+//                System.out.println("Deleted " + deletedCount + " refresh tokens for user: " + udi.getId());
+//            } catch (Exception e) {
+//                System.err.println("Error deleting refresh tokens: " + e.getMessage());
+//                e.printStackTrace();
+//            }
+//        }
+//        return ResponseEntity.ok()
+//                .header(HttpHeaders.SET_COOKIE, jwtUtils.getCleanJwtCookie().toString())
+//                .header(HttpHeaders.SET_COOKIE, refreshTokenService.getCleanRefreshTokenCookie().toString())
+//                .body("Signed out");
+//    }
 }
